@@ -24,10 +24,20 @@ import (
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 )
 
+// LogQuery specifies which part of the logs should be returned.
+// StartIndex and Count specify the range from the log list to be returned.
+type LogQuery struct {
+	Namespace  string
+	PodID      string
+	Container  string
+	StartIndex int64
+	Count      int64
+}
+
 // Logs is a representation of logs response structure.
 type Logs struct {
 	// Pod name.
-	PodId string `json:"podId"`
+	PodID string `json:"PodID"`
 
 	// Specific time when logs started.
 	SinceTime unversioned.Time `json:"sinceTime"`
@@ -37,44 +47,50 @@ type Logs struct {
 
 	// The name of the container the logs are for.
 	Container string `json:"container"`
+
+	// The current total number of logs for this Container
+	Total int64 `json:"total"`
+
+	// The index of the first returned log
+	StartIndex int64 `json:"startIndex"`
 }
 
 // GetPodLogs returns logs for particular pod and container or error when occurred. When container
 // is null, logs for the first one are returned.
-func GetPodLogs(client *client.Client, namespace, podId string, container string) (*Logs, error) {
-	log.Printf("Getting logs from %s container from %s pod in %s namespace", container, podId,
-		namespace)
+func GetPodLogs(client *client.Client, query *LogQuery) (*Logs, error) {
+	log.Printf("Getting logs from %s container from %s pod in %s namespace", query.Container, query.PodID,
+		query.Namespace)
 
-	pod, err := client.Pods(namespace).Get(podId)
+	pod, err := client.Pods(query.Namespace).Get(query.PodID)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(container) == 0 {
-		container = pod.Spec.Containers[0].Name
+	if query.Container == "" {
+		query.Container = pod.Spec.Containers[0].Name
 	}
 
 	logOptions := &api.PodLogOptions{
-		Container:  container,
+		Container:  query.Container,
 		Follow:     false,
 		Previous:   false,
 		Timestamps: true,
 	}
 
-	rawLogs, err := getRawPodLogs(client, namespace, podId, logOptions)
+	rawLogs, err := getRawPodLogs(client, query, logOptions)
 	if err != nil {
 		return nil, err
 	}
 
-	return constructLogs(podId, pod.CreationTimestamp, rawLogs, container), nil
+	return constructLogs(pod.CreationTimestamp, rawLogs, query), nil
 }
 
 // Construct a request for getting the logs for a pod and retrieves the logs.
-func getRawPodLogs(client *client.Client, namespace, podID string, logOptions *api.PodLogOptions) (
+func getRawPodLogs(client *client.Client, query *LogQuery, logOptions *api.PodLogOptions) (
 	string, error) {
 	req := client.RESTClient.Get().
-		Namespace(namespace).
-		Name(podID).
+		Namespace(query.Namespace).
+		Name(query.PodID).
 		Resource("pods").
 		SubResource("log").
 		VersionedParams(logOptions, api.ParameterCodec)
@@ -95,12 +111,34 @@ func getRawPodLogs(client *client.Client, namespace, podID string, logOptions *a
 }
 
 // Return Logs structure for given parameters.
-func constructLogs(podId string, sinceTime unversioned.Time, rawLogs string, container string) *Logs {
-	logs := &Logs{
-		PodId:     podId,
-		SinceTime: sinceTime,
-		Logs:      strings.Split(rawLogs, "\n"),
-		Container: container,
+func constructLogs(sinceTime unversioned.Time, rawLogs string, query *LogQuery) *Logs {
+	logs := strings.Split(rawLogs, "\n")
+	startIndex, selectedLogs := selectLogs(logs, query.StartIndex, query.Count)
+	res := &Logs{
+		PodID:      query.PodID,
+		SinceTime:  sinceTime,
+		Logs:       selectedLogs,
+		Container:  query.Container,
+		Total:      int64(len(logs)),
+		StartIndex: startIndex,
 	}
-	return logs
+	return res
+}
+
+// Selects the logs for a specific page, count specifies the logs count per page.
+// Start index specifies the index of the first log on the page.
+func selectLogs(logs []string, startIndex, count int64) (int64, []string) {
+	if startIndex > (int64(len(logs))) {
+		startIndex = -1
+	}
+	// if startIndex negative, return the last logs page
+	if startIndex < 0 {
+		// integer division
+		startIndex = (int64(len(logs)) / count) * count
+	}
+	endIndex := startIndex + count
+	if endIndex > int64(len(logs)) {
+		endIndex = int64(len(logs))
+	}
+	return startIndex, logs[startIndex:endIndex]
 }

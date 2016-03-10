@@ -16,6 +16,7 @@
 
 $logs-color-black: #000;
 $logs-color-white: #fff;
+$page-nav-bg: #fafafa;
 
 .kd-logs-text-color-invert {
   background-color: $logs-color-black;
@@ -30,4 +31,8 @@ $logs-color-white: #fff;
 .kd-logs-element {
   padding: 0 (2 * $baseline-grid) 0 (2 * $baseline-grid);
   word-wrap: break-word;
+}
+
+.kd-logs-page-nav {
+  background-color: $page-nav-bg;
 }

@@ -263,7 +263,8 @@ backendApi.ReplicationControllerPods;
  *   podId: string,
  *   sinceTime: string,
  *   logs: !Array<string>,
- *   container: string
+ *   container: string,
+ *   total: int,
  * }}
  */
 backendApi.Logs;

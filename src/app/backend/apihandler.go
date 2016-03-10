@@ -154,11 +154,11 @@ func CreateHttpApiHandler(client *client.Client, heapsterClient HeapsterClient,
 	logsWs.Path("/api/v1/logs").
 		Produces(restful.MIME_JSON)
 	logsWs.Route(
-		logsWs.GET("/{namespace}/{podId}").
+		logsWs.GET("/{namespace}/{podId}/{startIndex}/{count}").
 			To(apiHandler.handleLogs).
 			Writes(Logs{}))
 	logsWs.Route(
-		logsWs.GET("/{namespace}/{podId}/{container}").
+		logsWs.GET("/{namespace}/{podId}/{container}/{startIndex}/{count}").
 			To(apiHandler.handleLogs).
 			Writes(Logs{}))
 	wsContainer.Add(logsWs)
@@ -437,10 +437,30 @@ func (apiHandler *ApiHandler) handleGetSecrets(request *restful.Request, respons
 // Handles log API call.
 func (apiHandler *ApiHandler) handleLogs(request *restful.Request, response *restful.Response) {
 	namespace := request.PathParameter("namespace")
-	podId := request.PathParameter("podId")
+	podID := request.PathParameter("podId")
 	container := request.PathParameter("container")
 
-	result, err := GetPodLogs(apiHandler.client, namespace, podId, container)
+	startIndex, err := strconv.ParseInt(request.PathParameter("startIndex"), 0, 64)
+	if err != nil {
+		handleInternalError(response, err)
+		return
+	}
+
+	count, err := strconv.ParseInt(request.PathParameter("count"), 0, 64)
+	if err != nil {
+		handleInternalError(response, err)
+		return
+	}
+
+	logQuery := &LogQuery{
+		Namespace:  namespace,
+		PodID:      podID,
+		Container:  container,
+		StartIndex: startIndex,
+		Count:      count,
+	}
+
+	result, err := GetPodLogs(apiHandler.client, logQuery)
 	if err != nil {
 		handleInternalError(response, err)
 		return
