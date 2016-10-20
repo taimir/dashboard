@@ -19,7 +19,14 @@ limitations under the License.
     <div class="kd-zerostate-message" layout-padding>
       <div class="kd-zerostate-title">{{::$ctrl.i18n.MSG_ZERO_STATE_TITLE}}</div>
       <div class="kd-zerostate-text">
-        <span ng-bind-html="::$ctrl.i18n.MSG_ZERO_STATE_TEXT"></span>
+        [[ You can
+          <a href="{{::$ctrl.deployAppHref}}">
+            deploy a containerized app
+          </a>, select another namespace or
+           <a href="http://kubernetes.io/docs/user-guide/ui/" target="_blank">
+             take the Dashboard Tour <i class="material-icons kd-zerostate-icon">open_in_new</i>
+           </a> to learn more | Text which appears on zero state view
+           under the title. It provides to deploy view or offers user to take the Dashboard Tour. ]]
       </div>
     </div>
   </kd-content>
